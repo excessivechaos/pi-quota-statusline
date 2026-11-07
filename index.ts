@@ -578,7 +578,9 @@ class RouterStatusline {
 		];
 		const hitRate = this.cacheHitRate();
 		if (hitRate !== undefined) {
-			segments.push(`${theme.fg("dim", "♻")} ${theme.fg("text", `${hitRate.toFixed(1)}%`)}`);
+			// The glyph is East-Asian-Neutral (pi-tui counts it as one column) but terminals usually draw
+			// U+267B at two, so the extra space keeps the number from touching it.
+			segments.push(`${theme.fg("dim", "♻ ")} ${theme.fg("text", `${hitRate.toFixed(1)}%`)}`);
 		}
 		const anthropic = quotaSegment("⚡", "claude", this.quota.anthropic, theme, now);
 		if (anthropic) segments.push(anthropic);

@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.1] - 2026-11-07
+
+### Fixed
+
+- Space after the `♻` cache glyph. U+267B is East-Asian-Neutral, so pi-tui measures it as one column,
+  but terminals usually draw it at two and swallow the following space, leaving the rate glued to the
+  symbol. The padding space is emitted inside the dim span so the gap survives either rendering.
+
 ## [1.2.0] - 2026-11-07
 
 ### Added

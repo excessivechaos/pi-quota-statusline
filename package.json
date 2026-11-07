@@ -1,6 +1,6 @@
 {
 	"name": "pi-quota-statusline",
-	"version": "1.2.0",
+	"version": "1.2.1",
 	"description": "Pi footer statusline: model and route, git branch, context usage, Claude and Codex subscription quota remaining, and a clock",
 	"keywords": ["pi-package", "pi", "statusline", "quota", "usage", "anthropic", "codex"],
 	"license": "MIT",
