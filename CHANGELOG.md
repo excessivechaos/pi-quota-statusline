@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.2.0] - 2026-11-07
+
+### Added
+
+- Cache hit rate segment, `♻ <rate>`, placed after context usage:
+  `cacheRead / (input + cacheRead + cacheWrite)` summed over every assistant message on the branch.
+  This is pi's own definition — its stats line prints `Cached: <tokens> (<rate>%)` the same way — so the
+  two never disagree.
+- Omits the segment when the branch has no prompt tokens or when no message reported cache activity, so
+  providers without caching do not render a meaningless `0%`. Recomputed only when the leaf or entry
+  count changes.
+
+### Verified
+
+- Synthetic branch (cacheRead 9500, promptTokens 13000) renders `♻ 73.1%`.
+- A real 123-assistant-turn session file sums to `cacheRead 11,090,688 / promptTokens 11,383,993` =
+  `97.4235%`; the rendered footer reads `♻ 97.4%`.
+- A no-cache branch and an empty branch both omit the segment.
+
 ## [1.1.1] - 2026-11-07
 
 ### Changed

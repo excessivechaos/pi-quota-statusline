@@ -325,6 +325,7 @@ class RouterStatusline {
 	private routedCache: { key: string; value: PhysicalResponse | undefined } | undefined;
 	private tierCache: { key: string; value: string | undefined } | undefined;
 	private contextCache: { key: string; value: ContextUsage | undefined } | undefined;
+	private hitRateCache: { key: string; value: number | undefined } | undefined;
 
 	constructor(
 		ctx: ExtensionContext,
@@ -502,6 +503,35 @@ class RouterStatusline {
 		return value;
 	}
 
+	/**
+	 * Prompt-cache hit rate over the branch, using pi's own definition for its stats line:
+	 * cache-read tokens over every prompt token (input + cache read + cache write). Undefined when the
+	 * branch has no prompt tokens yet, or when no message ever reported cache activity, so providers
+	 * that do not cache never render a meaningless 0%.
+	 */
+	private cacheHitRate(): number | undefined {
+		const manager = this.ctx.sessionManager;
+		const key = `${manager.getLeafId() ?? "none"}:${manager.getEntries().length}`;
+		if (this.hitRateCache?.key === key) return this.hitRateCache.value;
+
+		let read = 0;
+		let prompt = 0;
+		let reported = false;
+		for (const entry of manager.getBranch()) {
+			if (entry.type !== "message") continue;
+			const message = entry.message;
+			if (message.role !== "assistant" || !message.usage) continue;
+			const usage = message.usage;
+			read += usage.cacheRead;
+			prompt += usage.input + usage.cacheRead + usage.cacheWrite;
+			if (usage.cacheRead + usage.cacheWrite > 0) reported = true;
+		}
+
+		const value = prompt > 0 && reported ? (read / prompt) * 100 : undefined;
+		this.hitRateCache = { key, value };
+		return value;
+	}
+
 	private segments(): string[] {
 		const { ctx, theme, footerData } = this;
 		const selected = ctx.model;
@@ -546,6 +576,10 @@ class RouterStatusline {
 			`${theme.fg("dim", "📁")} ${theme.fg("accent", branch)}`,
 			`${theme.fg("dim", "🪟")} ${theme.fg("text", `${percent} ${used}/${windowText}`)}`,
 		];
+		const hitRate = this.cacheHitRate();
+		if (hitRate !== undefined) {
+			segments.push(`${theme.fg("dim", "♻")} ${theme.fg("text", `${hitRate.toFixed(1)}%`)}`);
+		}
 		const anthropic = quotaSegment("⚡", "claude", this.quota.anthropic, theme, now);
 		if (anthropic) segments.push(anthropic);
 		const codex = quotaSegment("🧠", "codex", this.quota.codex, theme, now);
