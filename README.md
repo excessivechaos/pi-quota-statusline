@@ -57,9 +57,21 @@ orange directly. The `↻` countdown keeps the default text colour.
 
 ## Install
 
+Unpinned, so `pi update` can pull newer commits later:
+
 ```sh
-pi install git:github.com/excessivechaos/pi-quota-statusline@v1.0.0
+pi install git:github.com/excessivechaos/pi-quota-statusline
+pi update git:github.com/excessivechaos/pi-quota-statusline   # pick up new commits
 ```
+
+A pinned ref (`@v1.1.0`, or a commit hash) never moves on its own:
+
+```sh
+pi install git:github.com/excessivechaos/pi-quota-statusline@v1.1.0
+```
+
+Prefer `pi update <source>` over `pi update --extensions` when other installed packages carry local
+patches, since `--extensions` reconciles every package in `settings.json` at once.
 
 Other forms:
 
