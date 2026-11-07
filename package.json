@@ -1,0 +1,19 @@
+{
+	"name": "pi-quota-statusline",
+	"version": "1.0.0",
+	"description": "Pi footer statusline: model and route, git branch, context usage, Claude and Codex subscription quota remaining, and a clock",
+	"keywords": ["pi-package", "pi", "statusline", "quota", "usage", "anthropic", "codex"],
+	"license": "MIT",
+	"type": "module",
+	"files": ["index.ts", "README.md", "CHANGELOG.md", "LICENSE"],
+	"pi": {
+		"extensions": ["./index.ts"]
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-coding-agent": "*",
+		"@earendil-works/pi-tui": "*"
+	},
+	"engines": {
+		"node": ">=22.19.0"
+	}
+}
