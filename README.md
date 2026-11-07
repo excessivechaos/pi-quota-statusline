@@ -35,14 +35,16 @@ Each quota number is coloured from the remaining percentage:
 
 | Remaining | Colour |
 |---|---|
-| `> 25%` | green (`success` theme token) |
-| `1–25%` | orange (ANSI 256 colour 208) |
-| `0%` | red (`error` theme token) |
+| `> 25%` | green (`success`) |
+| `1–25%` | amber (`warning`) |
+| `0%` | red (`error`) |
 
 The threshold is applied to the rounded value that is displayed, so the colour always agrees with the
-number. Green and red use the theme's own `success`/`error` tokens and follow the active theme; neither
-built-in theme carries an orange token (`warning` is yellow in both), so the warning band uses ANSI 256
-orange directly. The `↻` countdown keeps the default text colour.
+number. All three are theme tokens, so the band follows the active theme; the token named `warning` is
+`vars.yellow = okhsl(83 88% 67%)` on the dark theme and `okhsl(83 99% 47%)` on the light theme, which
+resolves to amber rather than primary yellow — `#cd9a22` on dark, `#8f6802` on light. Nothing is
+hardcoded, so a custom theme recolours the band with the rest of its palette. The `↻` countdown keeps
+the default text colour.
 
 ## Requirements
 

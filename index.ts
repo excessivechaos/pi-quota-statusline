@@ -22,7 +22,7 @@ import type {
 	Theme,
 	ThemeColor,
 } from "@earendil-works/pi-coding-agent";
-import { visibleWidth, type Color, type TUI } from "@earendil-works/pi-tui";
+import { visibleWidth, type TUI } from "@earendil-works/pi-tui";
 
 const QUOTA_REFRESH_MS = 5 * 60_000;
 const QUOTA_TIMEOUT_MS = 10_000;
@@ -33,13 +33,12 @@ const ANTHROPIC_OAUTH_BETA = "oauth-2025-04-20";
 /** The usage endpoint aggressively 429s requests without a claude-code user agent. */
 const ANTHROPIC_USER_AGENT = "claude-code/2.1";
 const CODEX_JWT_CLAIM_PATH = "https://api.openai.com/auth";
-/** Remaining quota at or below this percent is rendered as a warning. */
-const QUOTA_WARNING_PERCENT = 25;
 /**
- * Orange for the warning band. Neither built-in theme carries an orange token (`warning` is yellow
- * in both), so this is ANSI 256 orange directly; green and red keep their theme tokens.
+ * Remaining quota at or below this percent is rendered with the theme's warning token. The token is
+ * named "yellow", but both built-in themes resolve it to amber: #cd9a22 on dark, #8f6802 on light
+ * (`vars.yellow` = okhsl(83 88% 67%) and okhsl(83 99% 47%)), so the band reads warm, not primary.
  */
-const QUOTA_WARNING_COLOR: Color = { kind: "indexed", index: 208 };
+const QUOTA_WARNING_PERCENT = 25;
 
 interface QuotaWindow {
 	/**
@@ -282,9 +281,9 @@ function formatCountdown(resetAt: number | undefined, now: number): string {
 	return remainingHours ? `${days}d${remainingHours}h` : `${days}d`;
 }
 
-function quotaColor(remainingPercent: number): ThemeColor | Color {
+function quotaColor(remainingPercent: number): ThemeColor {
 	if (remainingPercent <= 0) return "error";
-	if (remainingPercent <= QUOTA_WARNING_PERCENT) return QUOTA_WARNING_COLOR;
+	if (remainingPercent <= QUOTA_WARNING_PERCENT) return "warning";
 	return "success";
 }
 
@@ -303,7 +302,7 @@ function quotaSegment(
 	const format = (window: QuotaWindow | undefined): string => {
 		if (!window) return "—";
 		const remaining = Math.round(window.remainingPercent);
-		const left = theme.style(`${remaining}%`, { fg: quotaColor(remaining) });
+		const left = theme.fg(quotaColor(remaining), `${remaining}%`);
 		return window.resetAt === undefined ? left : `${left} ↻ ${formatCountdown(window.resetAt, now)}`;
 	};
 	return [
