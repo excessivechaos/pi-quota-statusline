@@ -578,9 +578,9 @@ class RouterStatusline {
 		];
 		const hitRate = this.cacheHitRate();
 		if (hitRate !== undefined) {
-			// The glyph is East-Asian-Neutral (pi-tui counts it as one column) but terminals usually draw
-			// U+267B at two, so the extra space keeps the number from touching it.
-			segments.push(`${theme.fg("dim", "♻ ")} ${theme.fg("text", `${hitRate.toFixed(1)}%`)}`);
+			// U+1F4BE is East-Asian-Wide: pi-tui counts it as two columns and terminals draw it as two, so a
+			// single space is enough and the wrap arithmetic stays exact.
+			segments.push(`${theme.fg("dim", "💾")} ${theme.fg("text", `${hitRate.toFixed(1)}%`)}`);
 		}
 		const anthropic = quotaSegment("⚡", "claude", this.quota.anthropic, theme, now);
 		if (anthropic) segments.push(anthropic);

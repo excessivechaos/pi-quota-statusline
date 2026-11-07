@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.2] - 2026-11-07
+
+### Changed
+
+- Cache hit rate glyph is now `💾` (U+1F4BE floppy disk) instead of `♻`. U+1F4BE is East-Asian-Wide, so
+  pi-tui measures it as two columns and terminals draw it as two: the glyph and the renderer agree, and
+  the padding space added in 1.2.1 is gone, leaving `💾 97.4%` with a single space and exact wrap
+  arithmetic.
+
 ## [1.2.1] - 2026-11-07
 
 ### Fixed

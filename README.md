@@ -3,7 +3,7 @@
 A pi footer statusline that shows, left to right:
 
 ```
-🤖 router/auto → high: opus-5-5 🧠 high · 📁 main · 🪟 6.0% 12k/200k · ♻ 97.4% · ⚡ claude · 5h 100% · wk 0% ↻ 7h8m · 🧠 codex · 5h 100% ↻ 3h41m · wk 26% ↻ 4d1h · 🕒 17:52
+🤖 router/auto → high: opus-5-5 🧠 high · 📁 main · 🪟 6.0% 12k/200k · 💾 97.4% · ⚡ claude · 5h 100% · wk 0% ↻ 7h8m · 🧠 codex · 5h 100% ↻ 3h41m · wk 26% ↻ 4d1h · 🕒 17:52
 ```
 
 | Segment | Meaning |
@@ -11,7 +11,7 @@ A pi footer statusline that shows, left to right:
 | `🤖 <model> 🧠 <level>` | The selected model and thinking level. With a `router/*` selection it also shows the physical model the route chose and, for tiered profiles, the tier. |
 | `📁 <branch>` | Git branch of the working directory. |
 | `🪟 <% used tokens/window>` | Context window usage. |
-| `♻ <rate>` | Prompt-cache hit rate over the session branch. See below. |
+| `💾 <rate>` | Prompt-cache hit rate over the session branch. See below. |
 | `⚡ claude` | Claude subscription quota: `5h` session window, `wk` weekly window. |
 | `🧠 codex` | ChatGPT Codex subscription quota: `5h` session window, `wk` weekly window. |
 | `🕒 <HH:MM>` | Local clock, repainted on the minute boundary. |
