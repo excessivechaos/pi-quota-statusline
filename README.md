@@ -29,6 +29,21 @@ A provider line appears only when `auth.json` has an entry for it (`anthropic`, 
 A failed read renders `—` rather than a stale or guessed figure, and a single transient auth-file
 read failure keeps the last known values.
 
+## Colour
+
+Each quota number is coloured from the remaining percentage:
+
+| Remaining | Colour |
+|---|---|
+| `> 25%` | green (`success` theme token) |
+| `1–25%` | orange (ANSI 256 colour 208) |
+| `0%` | red (`error` theme token) |
+
+The threshold is applied to the rounded value that is displayed, so the colour always agrees with the
+number. Green and red use the theme's own `success`/`error` tokens and follow the active theme; neither
+built-in theme carries an orange token (`warning` is yellow in both), so the warning band uses ANSI 256
+orange directly. The `↻` countdown keeps the default text colour.
+
 ## Requirements
 
 - A pi install supplying `@earendil-works/pi-coding-agent` and `@earendil-works/pi-tui` (declared as

@@ -20,8 +20,9 @@ import type {
 	ExtensionContext,
 	ReadonlyFooterDataProvider,
 	Theme,
+	ThemeColor,
 } from "@earendil-works/pi-coding-agent";
-import { visibleWidth, type TUI } from "@earendil-works/pi-tui";
+import { visibleWidth, type Color, type TUI } from "@earendil-works/pi-tui";
 
 const QUOTA_REFRESH_MS = 5 * 60_000;
 const QUOTA_TIMEOUT_MS = 10_000;
@@ -32,6 +33,13 @@ const ANTHROPIC_OAUTH_BETA = "oauth-2025-04-20";
 /** The usage endpoint aggressively 429s requests without a claude-code user agent. */
 const ANTHROPIC_USER_AGENT = "claude-code/2.1";
 const CODEX_JWT_CLAIM_PATH = "https://api.openai.com/auth";
+/** Remaining quota at or below this percent is rendered as a warning. */
+const QUOTA_WARNING_PERCENT = 25;
+/**
+ * Orange for the warning band. Neither built-in theme carries an orange token (`warning` is yellow
+ * in both), so this is ANSI 256 orange directly; green and red keep their theme tokens.
+ */
+const QUOTA_WARNING_COLOR: Color = { kind: "indexed", index: 208 };
 
 interface QuotaWindow {
 	/**
@@ -274,6 +282,12 @@ function formatCountdown(resetAt: number | undefined, now: number): string {
 	return remainingHours ? `${days}d${remainingHours}h` : `${days}d`;
 }
 
+function quotaColor(remainingPercent: number): ThemeColor | Color {
+	if (remainingPercent <= 0) return "error";
+	if (remainingPercent <= QUOTA_WARNING_PERCENT) return QUOTA_WARNING_COLOR;
+	return "success";
+}
+
 function quotaSegment(
 	icon: string,
 	label: string,
@@ -288,7 +302,8 @@ function quotaSegment(
 
 	const format = (window: QuotaWindow | undefined): string => {
 		if (!window) return "—";
-		const left = `${Math.round(window.remainingPercent)}%`;
+		const remaining = Math.round(window.remainingPercent);
+		const left = theme.style(`${remaining}%`, { fg: quotaColor(remaining) });
 		return window.resetAt === undefined ? left : `${left} ↻ ${formatCountdown(window.resetAt, now)}`;
 	};
 	return [
