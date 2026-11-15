@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.3.0] - 2026-11-15
+
+### Changed
+
+- Quota segments now read [pi-quota-peek](https://github.com/excessivechaos/pi-quota-peek) through its
+  `pi-quota-peek:snapshot` symbol: one fetch per five minutes per provider for the whole process,
+  shared with every other consumer, instead of this extension fetching the Anthropic and Codex usage
+  endpoints on its own. The local collectors, JWT decoding and fetch plumbing are gone. Without
+  pi-quota-peek loaded the segments render `-` and one notice names the missing package; `present`
+  still comes from the local auth.json read.
+- `stale` snapshots (a refresh backing off after a failure) keep the last good windows on the footer
+  instead of dropping to `-`.
+
+
 ## [1.2.2] - 2026-11-07
 
 ### Changed

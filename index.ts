@@ -25,14 +25,7 @@ import type {
 import { visibleWidth, type TUI } from "@earendil-works/pi-tui";
 
 const QUOTA_REFRESH_MS = 5 * 60_000;
-const QUOTA_TIMEOUT_MS = 10_000;
 const CLOCK_INTERVAL_MS = 60_000;
-const ANTHROPIC_USAGE_URL = "https://api.anthropic.com/api/oauth/usage";
-const CODEX_USAGE_URL = "https://chatgpt.com/backend-api/wham/usage";
-const ANTHROPIC_OAUTH_BETA = "oauth-2025-04-20";
-/** The usage endpoint aggressively 429s requests without a claude-code user agent. */
-const ANTHROPIC_USER_AGENT = "claude-code/2.1";
-const CODEX_JWT_CLAIM_PATH = "https://api.openai.com/auth";
 /**
  * Remaining quota at or below this percent is rendered with the theme's warning token. The token is
  * named "yellow", but both built-in themes resolve it to amber: #cd9a22 on dark, #8f6802 on light
@@ -111,63 +104,31 @@ function percentage(value: unknown): number | undefined {
 	return Math.min(100, Math.max(0, raw));
 }
 
-/** Normalize one Anthropic or Codex window object. */
-function parseQuotaWindow(value: unknown, fetchedAt: number): QuotaWindow | undefined {
-	const item = asRecord(value);
-	if (!item) return undefined;
-	const usedPercent = percentage(item.utilization ?? item.used_percent ?? item.used_percentage);
-	if (usedPercent === undefined) return undefined;
+/**
+ * Quota numbers come from pi-quota-peek, the single source of truth: the
+ * `pi-quota-peek:snapshot` symbol carries normalized windows fetched once per
+ * process. Without peek loaded, the segments render `-` and one notice says so.
+ */
+const PEEK_SNAPSHOT = Symbol.for("pi-quota-peek:snapshot");
 
-	let resetAt = toEpochMs(item.resets_at ?? item.reset_at);
-	if (resetAt === undefined) {
-		const afterSeconds = finiteNumber(item.reset_after_seconds ?? item.reset_after);
-		if (afterSeconds !== undefined && afterSeconds >= 0) resetAt = fetchedAt + afterSeconds * 1000;
-	}
-	return { remainingPercent: 100 - usedPercent, resetAt };
+/** One peek window, mapped to the footer's inverted percentage. */
+export function toQuotaWindow(window: { usedPercent: number; resetAt?: number } | undefined): QuotaWindow | undefined {
+	return window === undefined ? undefined : { remainingPercent: 100 - window.usedPercent, resetAt: window.resetAt };
 }
 
-function parseAnthropicUsage(payload: unknown, fetchedAt: number): Pick<ProviderQuota, "primary" | "secondary"> | undefined {
-	const root = asRecord(payload);
-	if (!root) return undefined;
-	const primary = parseQuotaWindow(root.five_hour, fetchedAt);
-	const secondary = parseQuotaWindow(root.seven_day, fetchedAt);
-	return primary || secondary ? { primary, secondary } : undefined;
-}
-
-function parseCodexUsage(payload: unknown, fetchedAt: number): Pick<ProviderQuota, "primary" | "secondary"> | undefined {
-	const limits = asRecord(asRecord(payload)?.rate_limit);
-	if (!limits) return undefined;
-	const primary = parseQuotaWindow(limits.primary_window, fetchedAt);
-	const secondary = parseQuotaWindow(limits.secondary_window, fetchedAt);
-	return primary || secondary ? { primary, secondary } : undefined;
-}
-
-function authToken(entry: unknown): string | undefined {
-	if (typeof entry === "string") return entry.trim() || undefined;
-	const record = asRecord(entry);
-	if (!record) return undefined;
-	for (const key of ["access", "token", "apiKey", "key"]) {
-		const value = record[key];
-		if (typeof value === "string" && value.trim()) return value.trim();
-	}
-	return undefined;
-}
-
-function codexAccountId(token: string, entry: unknown): string | undefined {
-	const parts = token.split(".");
-	if (parts.length === 3 && parts[1]) {
-		try {
-			const payload = asRecord(JSON.parse(Buffer.from(parts[1], "base64url").toString("utf-8")));
-			const claim = asRecord(payload?.[CODEX_JWT_CLAIM_PATH]);
-			const accountId = claim?.chatgpt_account_id;
-			if (typeof accountId === "string" && accountId) return accountId;
-		} catch {
-			// Fall through to the auth entry's accountId.
-		}
-	}
-	const record = asRecord(entry);
-	const fallback = record?.accountId ?? record?.chatgpt_account_id;
-	return typeof fallback === "string" && fallback ? fallback : undefined;
+/** The footer's window pair from one provider's peek snapshot. */
+export function quotaFromSnapshot(provider: string, snapshot: unknown): Pick<ProviderQuota, "primary" | "secondary" | "ok"> {
+	const record = asRecord(snapshot);
+	const windows = Array.isArray(record?.windows) ? (record.windows as Array<{ name?: string }>) : [];
+	const pick = (...names: string[]) => {
+		const match = windows.find((window) => names.includes(String(window.name ?? "")));
+		return toQuotaWindow(match as { usedPercent: number; resetAt?: number } | undefined);
+	};
+	if (record?.status === "error" || windows.length === 0) return { ok: false };
+	// `stale` keeps the last good windows on the footer while a refresh backs off.
+	const primary = provider === "anthropic" ? pick("five_hour") : pick("5h");
+	const secondary = provider === "anthropic" ? pick("seven_day", "seven_day_opus", "seven_day_sonnet") : pick("7d");
+	return { ok: true, ...(primary || secondary ? { primary, secondary } : {}) };
 }
 
 function authPath(): string {
@@ -204,47 +165,15 @@ async function readAuth(): Promise<AuthEntries | undefined> {
 	}
 }
 
-async function fetchJson(url: string, headers: Record<string, string>): Promise<unknown> {
-	const response = await fetch(url, { headers, signal: AbortSignal.timeout(QUOTA_TIMEOUT_MS) });
-	if (!response.ok) return undefined;
-	try {
-		return (await response.json()) as unknown;
-	} catch {
-		return undefined;
-	}
-}
-
-async function readAnthropicQuota(entry: unknown): Promise<ProviderQuota> {
+async function readQuota(ctx: ExtensionContext, provider: string, entry: unknown): Promise<ProviderQuota> {
 	if (entry === undefined) return { present: false, ok: false };
-	const token = authToken(entry);
-	if (!token) return { present: true, ok: false };
-	try {
-		const payload = await fetchJson(ANTHROPIC_USAGE_URL, {
-			Authorization: `Bearer ${token}`,
-			"anthropic-beta": ANTHROPIC_OAUTH_BETA,
-			"User-Agent": ANTHROPIC_USER_AGENT,
-		});
-		const parsed = payload === undefined ? undefined : parseAnthropicUsage(payload, Date.now());
-		return parsed ? { present: true, ok: true, ...parsed } : { present: true, ok: false };
-	} catch {
-		return { present: true, ok: false };
-	}
-}
-
-async function readCodexQuota(entry: unknown): Promise<ProviderQuota> {
-	if (entry === undefined) return { present: false, ok: false };
-	const token = authToken(entry);
-	if (!token) return { present: true, ok: false };
-	try {
-		const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
-		const accountId = codexAccountId(token, entry);
-		if (accountId) headers["ChatGPT-Account-Id"] = accountId;
-		const payload = await fetchJson(CODEX_USAGE_URL, headers);
-		const parsed = payload === undefined ? undefined : parseCodexUsage(payload, Date.now());
-		return parsed ? { present: true, ok: true, ...parsed } : { present: true, ok: false };
-	} catch {
-		return { present: true, ok: false };
-	}
+	const peek = (globalThis as Record<symbol, unknown>)[PEEK_SNAPSHOT] as
+		| ((ctx: ExtensionContext, provider: string) => Promise<unknown>)
+		| undefined;
+	if (peek === undefined) return { present: true, ok: false };
+	const snapshot = await peek(ctx, provider);
+	if (snapshot === undefined) return { present: true, ok: false };
+	return { present: true, ...quotaFromSnapshot(provider, snapshot) };
 }
 
 function shortModelId(id: string): string {
@@ -322,6 +251,7 @@ class RouterStatusline {
 	private clockTimer: ReturnType<typeof setTimeout> | undefined;
 	private refreshing = false;
 	private disposed = false;
+	private reportedMissingPeek = false;
 	private routedCache: { key: string; value: PhysicalResponse | undefined } | undefined;
 	private tierCache: { key: string; value: string | undefined } | undefined;
 	private contextCache: { key: string; value: ContextUsage | undefined } | undefined;
@@ -391,9 +321,16 @@ class RouterStatusline {
 			// A transient auth read failure keeps the last known quota state.
 			if (auth === undefined || this.disposed) return;
 			const codexEntry = auth["openai-codex"] ?? auth.openai;
+			const peek = (globalThis as Record<symbol, unknown>)[PEEK_SNAPSHOT];
+			if (peek === undefined && !this.reportedMissingPeek) {
+				this.reportedMissingPeek = true;
+				try {
+					this.ctx.ui.notify("pi-quota-statusline: quota segments need pi-quota-peek", "warning");
+				} catch {}
+			}
 			const [anthropic, codex] = await Promise.all([
-				readAnthropicQuota(auth.anthropic),
-				readCodexQuota(codexEntry),
+				readQuota(this.ctx, "anthropic", auth.anthropic),
+				readQuota(this.ctx, "openai-codex", codexEntry),
 			]);
 			if (this.disposed) return;
 			this.quota = { anthropic, codex };
