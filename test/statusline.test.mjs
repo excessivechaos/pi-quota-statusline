@@ -56,7 +56,7 @@ test("banked resets render as one glyph and a count", () => {
 	const now = 1794693600000;
 	const base = { present: true, ok: true, primary: { remainingPercent: 0, resetAt: now + 3_600_000 }, secondary: { remainingPercent: 2 } };
 	const withTwo = m.quotaSegment("◆", "claude", { ...base, resets: 2 }, theme, now);
-	ok(withTwo.includes("↺2"), "the count appears");
+	ok(withTwo.includes("↺ 2"), "the count appears, spaced off the glyph");
 	const without = m.quotaSegment("◆", "claude", base, theme, now);
 	ok(!without.includes("↺"), "and nothing appears when there are none");
 	is(m.resetCount({ status: "available", grants: [{ resetsLeft: 2 }, { resetsLeft: 1, paused: true }] }), 2, "paused grants do not count");

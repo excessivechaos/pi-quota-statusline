@@ -263,8 +263,8 @@ export function quotaSegment(
 		const left = theme.fg(quotaColor(remaining), `${remaining}%`);
 		return window.resetAt === undefined ? left : `${left} ↻ ${formatCountdown(window.resetAt, now)}`;
 	};
-	// `↺n` = n banked full resets. Sits last so the windows keep their places.
-	const resets = quota.resets === undefined ? undefined : theme.fg("accent", `↺${quota.resets}`);
+	// `↺ n` = n banked full resets. Sits last so the windows keep their places.
+	const resets = quota.resets === undefined ? undefined : theme.fg("accent", `↺ ${quota.resets}`);
 	return [
 		heading,
 		`5h ${format(quota.primary)}`,
