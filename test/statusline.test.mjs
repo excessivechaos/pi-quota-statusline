@@ -51,4 +51,17 @@ test("peek snapshots map to footer windows", () => {
 	is(empty.ok, false, "no windows render the dash");
 });
 
+test("banked resets render as one glyph and a count", () => {
+	const theme = { fg: (_color, text) => text };
+	const now = 1794693600000;
+	const base = { present: true, ok: true, primary: { remainingPercent: 0, resetAt: now + 3_600_000 }, secondary: { remainingPercent: 2 } };
+	const withTwo = m.quotaSegment("◆", "claude", { ...base, resets: 2 }, theme, now);
+	ok(withTwo.includes("↺2"), "the count appears");
+	const without = m.quotaSegment("◆", "claude", base, theme, now);
+	ok(!without.includes("↺"), "and nothing appears when there are none");
+	is(m.resetCount({ status: "available", grants: [{ resetsLeft: 2 }, { resetsLeft: 1, paused: true }] }), 2, "paused grants do not count");
+	is(m.resetCount({ status: "gated", grants: [{ resetsLeft: 5 }] }), 0, "a gated read counts nothing");
+	is(m.resetCount(undefined), 0, "no answer counts nothing");
+});
+
 test("summary", () => console.log(`ok ${checks} checks`));

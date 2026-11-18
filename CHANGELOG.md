@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.0
+
+- **`↺n` in the provider segment** — the number of banked full-reset grants that provider still holds,
+  read from `pi-quota-peek:grants` (cached an hour there, so the footer's tick does not poll). One
+  glyph and a digit: the footer keeps the windows; `/quota-resume reset status` prints the detail.
+  Paused grants do not count, and a `gated` read shows nothing rather than a false zero.
+
+
 ## [1.3.0] - 2026-11-15
 
 ### Changed

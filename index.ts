@@ -49,6 +49,8 @@ interface ProviderQuota {
 	ok: boolean;
 	primary?: QuotaWindow;
 	secondary?: QuotaWindow;
+	/** Banked full-reset grants still unspent; 0 or missing renders nothing. */
+	resets?: number;
 }
 
 interface QuotaState {
@@ -110,6 +112,8 @@ function percentage(value: unknown): number | undefined {
  * process. Without peek loaded, the segments render `-` and one notice says so.
  */
 const PEEK_SNAPSHOT = Symbol.for("pi-quota-peek:snapshot");
+/** Banked-reset grants; peek caches the read for an hour, so polling this is cheap. */
+const PEEK_GRANTS = Symbol.for("pi-quota-peek:grants");
 
 /** One peek window, mapped to the footer's inverted percentage. */
 export function toQuotaWindow(window: { usedPercent: number; resetAt?: number } | undefined): QuotaWindow | undefined {
@@ -173,7 +177,32 @@ async function readQuota(ctx: ExtensionContext, provider: string, entry: unknown
 	if (peek === undefined) return { present: true, ok: false };
 	const snapshot = await peek(ctx, provider);
 	if (snapshot === undefined) return { present: true, ok: false };
-	return { present: true, ...quotaFromSnapshot(provider, snapshot) };
+	return { present: true, ...quotaFromSnapshot(provider, snapshot), ...(await readResets(ctx, provider)) };
+}
+
+/** Unspent resets across a grants answer; paused grants do not count. */
+export function resetCount(answer: unknown): number {
+	const record = answer as { status?: string; grants?: Array<{ resetsLeft?: number; paused?: boolean }> } | undefined;
+	if (record?.status !== "available") return 0;
+	return (record.grants ?? []).reduce((total, grant) => total + (grant.paused === true ? 0 : (grant.resetsLeft ?? 0)), 0);
+}
+
+/**
+ * How many banked resets the provider still offers. One glyph and a number: the
+ * footer has no room for grant detail, which `/quota-resume reset status` prints.
+ */
+async function readResets(ctx: ExtensionContext, provider: string): Promise<Pick<ProviderQuota, "resets">> {
+	const grantsFor = (globalThis as Record<symbol, unknown>)[PEEK_GRANTS] as
+		| ((ctx: ExtensionContext, provider: string) => Promise<{ status?: string; grants?: Array<{ resetsLeft?: number; paused?: boolean }> }>)
+		| undefined;
+	if (grantsFor === undefined) return {};
+	try {
+		const answer = await grantsFor(ctx, provider);
+		const resets = resetCount(answer);
+		return resets > 0 ? { resets } : {};
+	} catch {
+		return {};
+	}
 }
 
 function shortModelId(id: string): string {
@@ -216,7 +245,7 @@ function quotaColor(remainingPercent: number): ThemeColor {
 	return "success";
 }
 
-function quotaSegment(
+export function quotaSegment(
 	icon: string,
 	label: string,
 	quota: ProviderQuota,
@@ -234,10 +263,13 @@ function quotaSegment(
 		const left = theme.fg(quotaColor(remaining), `${remaining}%`);
 		return window.resetAt === undefined ? left : `${left} ↻ ${formatCountdown(window.resetAt, now)}`;
 	};
+	// `↺n` = n banked full resets. Sits last so the windows keep their places.
+	const resets = quota.resets === undefined ? undefined : theme.fg("accent", `↺${quota.resets}`);
 	return [
 		heading,
 		`5h ${format(quota.primary)}`,
 		`wk ${format(quota.secondary)}`,
+		...(resets === undefined ? [] : [resets]),
 	].join(separator);
 }
 
